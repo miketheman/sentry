@@ -7,7 +7,10 @@ from django.core.management.color import no_style
 from django.db import transaction, models
 from django.db.utils import DatabaseError
 from django.db.backends.util import truncate_name
-from django.db.backends.creation import BaseDatabaseCreation
+try:
+    from django.db.backends.creation import BaseDatabaseCreation
+except ImportError:
+    from django.db.backends.base.creation import BaseDatabaseCreation
 from django.db.models.fields import NOT_PROVIDED
 from django.dispatch import dispatcher
 from django.conf import settings
@@ -1012,9 +1015,9 @@ class DatabaseOperations(object):
         """
         if self.dry_run:
             self.pending_transactions += 1
-        transaction.commit_unless_managed(using=self.db_alias)
-        transaction.enter_transaction_management(using=self.db_alias)
-        transaction.managed(True, using=self.db_alias)
+        # transaction.commit_unless_managed(using=self.db_alias)
+        # transaction.enter_transaction_management(using=self.db_alias)
+        # transaction.managed(True, using=self.db_alias)
 
     def commit_transaction(self):
         """
@@ -1024,7 +1027,7 @@ class DatabaseOperations(object):
         if self.dry_run:
             return
         transaction.commit(using=self.db_alias)
-        transaction.leave_transaction_management(using=self.db_alias)
+        # transaction.leave_transaction_management(using=self.db_alias)
 
     def rollback_transaction(self):
         """
@@ -1034,7 +1037,7 @@ class DatabaseOperations(object):
         if self.dry_run:
             self.pending_transactions -= 1
         transaction.rollback(using=self.db_alias)
-        transaction.leave_transaction_management(using=self.db_alias)
+        # transaction.leave_transaction_management(using=self.db_alias)
 
     def rollback_transactions_dry_run(self):
         """
@@ -1044,10 +1047,10 @@ class DatabaseOperations(object):
             return
         while self.pending_transactions > 0:
             self.rollback_transaction()
-        if transaction.is_dirty(using=self.db_alias):
-            # Force an exception, if we're still in a dirty transaction.
-            # This means we are missing a COMMIT/ROLLBACK.
-            transaction.leave_transaction_management(using=self.db_alias)
+        # if transaction.is_dirty(using=self.db_alias):
+        #     # Force an exception, if we're still in a dirty transaction.
+        #     # This means we are missing a COMMIT/ROLLBACK.
+        #     transaction.leave_transaction_management(using=self.db_alias)
 
     def send_create_signal(self, app_label, model_names):
         self.pending_create_signals.append((app_label, model_names))
@@ -1090,9 +1093,14 @@ class DatabaseOperations(object):
 
         created_models = []
         for model_name in model_names:
-            model = models.get_model(app_label, model_name)
-            if model:
-                created_models.append(model)
+            try:
+                model = models.get_model(app_label, model_name)
+            # Django 1.7 throws LookupError
+            except LookupError:
+                pass
+            else:
+                if model:
+                    created_models.append(model)
 
         if created_models:
 
